@@ -1,0 +1,88 @@
+# 🚜 FarmStop Data Scraper
+---
+This directory contains the Python-based worker responsible for ingesting farm data from external sources and populating the FarmStop PostgreSQL (PostGIS) database.
+
+## 🏗 Architectural Decision: Why Containerization?
+While AWS Lambda natively supports Python runtimes, this specific workload was deployed as a Container Image (Docker) rather than a standard ZIP upload or S3 deployment.
+
+### The Challenge: Dependency Hell
+This scraper relies on heavy, compiled libraries including:
+
+psycopg2-binary: Requires C libraries (libpq) to communicate with PostgreSQL.
+pandas / geopandas: Large data manipulation libraries that often exceed Lambda's standard layer size limits.
+requests / selenium: (If applicable) Web scraping tools that require specific OS-level dependencies.
+Attempting to package these via standard Lambda Layers often results in "ELF Header Mismatch" errors because the binaries compiled on a local machine (MacOS/Windows) do not match the Amazon Linux environment used by Lambda.
+
+### The Solution: Docker
+By packaging the scraper as a Docker container, we ensure environment parity. We build the image using a base Linux image compatible with AWS Lambda. This ensures that:
+
+All system-level dependencies (like C compilers and libraries) are installed correctly.
+The exact code running locally is the exact code running in production.
+We bypass the 250MB size limit of standard Lambda deployment packages (Container images can be up to 10GB).
+🛠 Prerequisites
+Docker Desktop installed and running.
+AWS CLI configured with valid credentials.
+A created Amazon ECR (Elastic Container Registry) repository.
+
+## 📂 Project Structure
+```
+/scraper
+├── Dockerfile       # Container image & Lambda entrypoint
+├── requirements.txt # Python dependencies
+├── seed_farms.py    # Entry point and the scraper 
+└── .env             # Local environment variables (not committed)
+```
+
+## How to Run Locally
+```
+pip install -r requirements.txt # install dependencies
+python seed_farms.py            # after defining env 
+```
+or
+```
+docker build -t farmstop-scraper . # build image
+```
+Since the base image is the AWS Lambda Runtime Interface Emulator (RIE), you invoke it using curl:
+
+```code
+curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d '{}'
+```
+
+## Deployment Guide (AWS ECR & Lambda)
+
+We use a Makefile or Shell commands (or CI/CD) to deploy. Here is the manual process:
+
+
+1. Authenticate with ECR
+```
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
+```
+2. Build and Tag
+
+```
+docker build -t farmstop-scraper .
+docker tag farmstop-scraper:latest <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/farmstop-scraper:latest
+```
+3. Push to ECR
+```
+docker push <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/farmstop-scraper:latest
+```
+4. Update Lambda Function
+Once the image is in ECR, update the Lambda function to point to the new image digest:
+```
+aws lambda update-function-code \
+    --function-name FarmStop-Scraper \
+    --image-uri <YOUR_AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/farmstop-scraper:latest
+```
+
+## Environment Variables
+The scraper requires the following variables to be set in the AWS Lambda Console (Configuration -> Environment variables):
+
+Variable |	Description
+---
+DB_HOST:	The RDS endpoint URL </br>
+DB_PORT:	Database port (Default: 5432)</br>
+DB_NAME:	PostgreSQL database name</br>
+DB_USER:	Database username</br>
+DB_PASSWORD:	Database password (Store securely!)
+S3_BUCKET:	(Optional) Bucket for staging raw data
