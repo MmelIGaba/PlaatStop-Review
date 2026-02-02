@@ -4,6 +4,10 @@ import { MapPin, Store, Loader2 } from "lucide-react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+
+import { API_URL } from "../config/api"; 
+import { Farm } from "../types"; 
+
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -15,7 +19,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-function MapUpdater({ center }) {
+function MapUpdater({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
     map.setView(center, map.getZoom());
@@ -24,19 +28,19 @@ function MapUpdater({ center }) {
 }
 
 export default function FindFarms() {
-  const [position, setPosition] = useState(null);
-  const [farms, setFarms] = useState([]);
+  const [position, setPosition] = useState<[number, number] | null>(null);
+  const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
   const [radius, setRadius] = useState(50); 
-  const [selectedFarm, setSelectedFarm] = useState(null);
-  const [claimingId, setClaimingId] = useState(null);
+  const [selectedFarm, setSelectedFarm] = useState<Farm | null>(null);
+  const [claimingId, setClaimingId] = useState<number | null>(null);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => setPosition([pos.coords.latitude, pos.coords.longitude]),
         (err) => {
-          console.warn("Location access denied, using default (Pretoria).");
+          console.warn("Location access denied, using default (Pretoria).", err);
           setPosition([-25.7479, 28.2293]);
         }
       );
@@ -45,13 +49,12 @@ export default function FindFarms() {
     }
   }, []);
 
-  const fetchFarms = async () => {
-    if (!position) return;
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/farms/search`,
-        {
+  useEffect(() => {
+    const fetchFarms = async () => {
+      if (!position) return;
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/api/farms/search`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -59,23 +62,23 @@ export default function FindFarms() {
             lng: position[1],
             radiusInKm: radius,
           }),
-        },
-      );
-      if (!res.ok) throw new Error("Failed to fetch farms");
-      const data = await res.json();
-      setFarms(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+        });
 
-  useEffect(() => {
+        if (!res.ok) throw new Error("Failed to fetch farms");
+        const data = await res.json();
+        setFarms(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchFarms();
-  }, [position, radius]);
 
-  const handleClaim = async (farm) => {
+  }, [position, radius]); 
+
+  const handleClaim = async (farm: Farm) => {
     setClaimingId(farm.id);
     try {
       let session;
@@ -91,7 +94,7 @@ export default function FindFarms() {
       const token = session.tokens.accessToken.toString();
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/farms/${farm.id}/claim`,
+        `${API_URL}/api/farms/${farm.id}/claim`, // Use API_URL here too
         {
           method: "POST",
           headers: {
@@ -102,12 +105,12 @@ export default function FindFarms() {
       );
 
       const result = await res.json();
-
       if (!res.ok) throw new Error(result.error || "Failed to claim");
 
       alert("Success! You are now the owner of this farm profile.");
-      fetchFarms();
-    } catch (error) {
+      
+      window.location.reload(); 
+    } catch (error: any) {
       alert(error.message);
     } finally {
       setClaimingId(null);
@@ -123,7 +126,7 @@ export default function FindFarms() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] md:flex-row bg-gray-50">
-      {/* --- LEFT PANEL: LIST --- */}
+      {/* LEFT PANEL: LIST */}
       <div className="w-full md:w-1/3 overflow-y-auto p-4 border-r border-gray-200 bg-white z-10 shadow-lg relative">
         <div className="mb-6 sticky top-0 bg-white pt-2 pb-4 border-b z-20">
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
@@ -157,7 +160,12 @@ export default function FindFarms() {
               key={farm.id}
               onClick={() => {
                 setSelectedFarm(farm);
-                setPosition([farm.lat, farm.lng]); 
+                // Ensure farm location is valid before setting position
+                if(typeof farm.location === 'object' && 'y' in farm.location) {
+                   setPosition([farm.location.y, farm.location.x]); 
+                } else if (farm.lat && farm.lng) {
+                   setPosition([farm.lat, farm.lng]); 
+                }
               }}
               className={`p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md ${selectedFarm?.id === farm.id ? "ring-2 ring-green-500 bg-green-50" : "bg-white border-gray-200"}`}
             >
@@ -214,7 +222,7 @@ export default function FindFarms() {
         </div>
       </div>
 
-      {/* --- RIGHT PANEL: MAP --- */}
+      {/* RIGHT PANEL: MAP */}
       <div className="hidden md:block w-2/3 h-full relative">
         <MapContainer
           center={position}
@@ -227,12 +235,10 @@ export default function FindFarms() {
           />
           <MapUpdater center={position} />
           
-          {/* USER LOCATION */}
           <Marker position={position}>
             <Popup>You are here</Popup>
           </Marker>
 
-          {/* FARM LOCATIONS - Now using real coordinates */}
           {farms.map((farm) => (
              (farm.lat && farm.lng) ? (
               <Marker

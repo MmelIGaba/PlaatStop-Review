@@ -9,7 +9,7 @@ import {
   ArrowLeft,
   Loader2,
   CheckCircle,
-  KeyRound, 
+  KeyRound,
 } from "lucide-react";
 import {
   signIn,
@@ -17,12 +17,12 @@ import {
   confirmSignUp,
   resendSignUpCode,
   resetPassword,
-  confirmResetPassword, 
+  confirmResetPassword,
   fetchAuthSession,
 } from "aws-amplify/auth";
 
 export default function AuthModal({ isOpen, onClose }) {
-  const [view, setView] = useState("login"); 
+  const [view, setView] = useState("login");
   const [role, setRole] = useState("buyer");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -30,7 +30,7 @@ export default function AuthModal({ isOpen, onClose }) {
 
   const [formData, setFormData] = useState({
     email: "",
-    password: "", 
+    password: "",
     name: "",
     farmName: "",
     code: "",
@@ -84,7 +84,6 @@ export default function AuthModal({ isOpen, onClose }) {
 
         setSuccessMsg(`Code sent to ${formData.email}`);
         setView("confirm");
-      
       } else if (view === "confirm") {
         const cleanCode = formData.code.trim();
         await confirmSignUp({
@@ -98,7 +97,6 @@ export default function AuthModal({ isOpen, onClose }) {
         });
         await syncUser();
         onClose();
-
       } else if (view === "login") {
         try {
           const { isSignedIn } = await signIn({
@@ -113,10 +111,10 @@ export default function AuthModal({ isOpen, onClose }) {
         } catch (loginErr) {
           if (loginErr.name === "UserNotConfirmedException") {
             try {
-                await resendSignUpCode({ username: formData.email });
-                setSuccessMsg("Account unverified. A new code has been sent.");
+              await resendSignUpCode({ username: formData.email });
+              setSuccessMsg("Account unverified. A new code has been sent.");
             } catch (resendErr) {
-                setSuccessMsg("Account unverified. Please enter the code.");
+              setSuccessMsg("Account unverified. Please enter the code.");
             }
             setView("confirm");
             return;
@@ -124,23 +122,20 @@ export default function AuthModal({ isOpen, onClose }) {
           throw loginErr;
         }
 
-      // --- STEP 1: REQUEST RESET ---
       } else if (view === "forgot-password") {
         await resetPassword({ username: formData.email });
         setSuccessMsg("Reset code sent to email.");
-        setView("forgot-password-submit"); 
-      
-      // --- STEP 2: CONFIRM RESET ---
+        setView("forgot-password-submit");
+
       } else if (view === "forgot-password-submit") {
         await confirmResetPassword({
-            username: formData.email,
-            confirmationCode: formData.code,
-            newPassword: formData.password
+          username: formData.email,
+          confirmationCode: formData.code,
+          newPassword: formData.password,
         });
         setSuccessMsg("Password changed! Please log in.");
         setView("login");
       }
-
     } catch (err) {
       console.error(err);
       setError(err.message || "An error occurred");
@@ -150,12 +145,12 @@ export default function AuthModal({ isOpen, onClose }) {
   };
 
   const getTitle = () => {
-    if(view === "login") return "Welcome back";
-    if(view === "signup") return "Create an account";
-    if(view === "confirm") return "Verify Email";
-    if(view === "forgot-password") return "Reset Password";
-    if(view === "forgot-password-submit") return "Set New Password";
-  }
+    if (view === "login") return "Welcome back";
+    if (view === "signup") return "Create an account";
+    if (view === "confirm") return "Verify Email";
+    if (view === "forgot-password") return "Reset Password";
+    if (view === "forgot-password-submit") return "Set New Password";
+  };
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6">
@@ -176,9 +171,7 @@ export default function AuthModal({ isOpen, onClose }) {
             <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
               <Tractor className="h-6 w-6 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {getTitle()}
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900">{getTitle()}</h2>
           </div>
 
           {error && (
@@ -201,7 +194,11 @@ export default function AuthModal({ isOpen, onClose }) {
                   onClick={() => setRole(r)}
                   className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all capitalize cursor-pointer ${role === r ? "bg-white shadow text-green-700" : "text-gray-500 hover:text-gray-700"}`}
                 >
-                  {r === "buyer" ? <User className="h-4 w-4" /> : <Store className="h-4 w-4" />}
+                  {r === "buyer" ? (
+                    <User className="h-4 w-4" />
+                  ) : (
+                    <Store className="h-4 w-4" />
+                  )}
                   {r === "vendor" ? "Farmer" : "Buyer"}
                 </button>
               ))}
@@ -216,7 +213,9 @@ export default function AuthModal({ isOpen, onClose }) {
                 required
                 placeholder="Full Name"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
               />
             )}
 
@@ -230,21 +229,31 @@ export default function AuthModal({ isOpen, onClose }) {
                   value={formData.email}
                   placeholder="Email"
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
                 />
               </div>
             )}
 
             {/* PASSWORD (Used for Login, Signup, AND New Password) */}
-            {(view === "signup" || view === "login" || view === "forgot-password-submit") && (
+            {(view === "signup" ||
+              view === "login" ||
+              view === "forgot-password-submit") && (
               <div className="relative">
                 <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                 <input
                   type="password"
                   required
-                  placeholder={view === "forgot-password-submit" ? "New Password" : "Password"}
+                  placeholder={
+                    view === "forgot-password-submit"
+                      ? "New Password"
+                      : "Password"
+                  }
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
                 />
               </div>
             )}
@@ -258,13 +267,20 @@ export default function AuthModal({ isOpen, onClose }) {
                   required
                   placeholder="Verification Code"
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, code: e.target.value })
+                  }
                 />
                 {view === "confirm" && (
-                    <p className="text-xs text-right mt-1 text-gray-500 cursor-pointer hover:text-green-600"
-                    onClick={async () => { await resendSignUpCode({ username: formData.email }); setSuccessMsg("Code resent!"); }}>
+                  <p
+                    className="text-xs text-right mt-1 text-gray-500 cursor-pointer hover:text-green-600"
+                    onClick={async () => {
+                      await resendSignUpCode({ username: formData.email });
+                      setSuccessMsg("Code resent!");
+                    }}
+                  >
                     Resend Code
-                    </p>
+                  </p>
                 )}
               </div>
             )}
@@ -306,15 +322,24 @@ export default function AuthModal({ isOpen, onClose }) {
           {/* FOOTER */}
           <div className="mt-6 text-center text-sm text-gray-500">
             {view === "login" ? (
-              <button onClick={() => setView("signup")} className="font-semibold text-green-600 cursor-pointer">
+              <button
+                onClick={() => setView("signup")}
+                className="font-semibold text-green-600 cursor-pointer"
+              >
                 Sign up
               </button>
             ) : view === "signup" ? (
-              <button onClick={() => setView("login")} className="font-semibold text-green-600 cursor-pointer">
+              <button
+                onClick={() => setView("login")}
+                className="font-semibold text-green-600 cursor-pointer"
+              >
                 Log in
               </button>
             ) : (
-              <button onClick={() => setView("login")} className="font-semibold text-green-600 flex items-center justify-center gap-1 mx-auto cursor-pointer">
+              <button
+                onClick={() => setView("login")}
+                className="font-semibold text-green-600 flex items-center justify-center gap-1 mx-auto cursor-pointer"
+              >
                 <ArrowLeft className="h-4 w-4" /> Back to Login
               </button>
             )}
