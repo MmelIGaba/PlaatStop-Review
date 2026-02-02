@@ -9,6 +9,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
     
     defaults:
       run:
@@ -18,9 +19,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Optional: Run Tests here if you have them
-      # - name: Run Tests
-      #   run: npm test
+      - name: Run Tests
+        run: npm test
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -30,9 +30,14 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Trigger ASG Instance Refresh
-        # This forces the Auto Scaling Group to replace instances with new ones
-        # New instances will pull the latest code via their UserData script
         run: |
           aws autoscaling start-instance-refresh \
             --auto-scaling-group-name ${{ secrets.ASG_NAME }} \
-            --preferences '{"MinHealthyPercentage": 50, "InstanceWarmup": 60}'
+            --preferences '{"MinHealthyPercentage": 90, "InstanceWarmup": 60}'
+
+      - name: Notify Deployment Status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
