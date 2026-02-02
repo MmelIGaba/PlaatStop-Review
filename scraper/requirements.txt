@@ -2,3 +2,4 @@ psycopg2-binary
 geopy
 python-dotenv
 pydantic-settings
+tenacity  
