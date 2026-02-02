@@ -33,13 +33,16 @@ resource "aws_instance" "app_server" {
               chown ec2-user:ec2-user /home/ec2-user/app
               
               # Clone Logic
-              git clone -b main https://github.com/MmelIGaba/FarmStop.git /home/ec2-user/app
+              git clone -b main ${var.repository_url} /home/ec2-user/app
               
               cd /home/ec2-user/app/backend
               npm install
               
+              # Fetch database password from Secrets Manager
+              DB_PASS=$(aws secretsmanager get-secret-value --secret-id ${aws_secretsmanager_secret.db_password.name} --query SecretString --output text | jq -r '.password')
+
               # Inject Env Vars
-              echo "DATABASE_URL=postgres://postgres:mysecretpassword@${aws_db_instance.default.address}:5432/plaasstop" > .env
+              echo "DATABASE_URL=postgres://postgres:$DB_PASS@${aws_db_instance.default.address}:5432/plaasstop" > .env
               echo "PORT=5000" >> .env
               
               # Allow CloudFront to talk to us
